@@ -20,9 +20,20 @@ var saveCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		title := args[0]
 		content, _ := io.ReadAll(os.Stdin)
+
+		// Parse tags
+		var tagList []string
+		if tags != "" {
+			tagList = strings.Split(tags, ",")
+			// Trim whitespace from each tag
+			for i, tag := range tagList {
+				tagList[i] = strings.TrimSpace(tag)
+			}
+		}
+
 		snippet := models.Snippet{
 			Title:     title,
-			Tags:      strings.Split(tags, ","),
+			Tags:      tagList,
 			CreatedAt: time.Now(),
 			Content:   string(content),
 		}

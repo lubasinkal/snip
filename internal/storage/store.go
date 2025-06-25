@@ -3,6 +3,8 @@ package storage
 import (
 	"database/sql"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -14,7 +16,18 @@ var db *sql.DB
 
 func init() {
 	var err error
-	db, err = sql.Open("sqlite", "/tmp/snip.db")
+
+	// Get database path
+	dbPath := getDBPath()
+
+	// Ensure directory exists
+	dbDir := filepath.Dir(dbPath)
+	err = os.MkdirAll(dbDir, 0755)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to create database directory: %v", err))
+	}
+
+	db, err = sql.Open("sqlite", dbPath)
 	if err != nil {
 		panic(err)
 	}
@@ -33,7 +46,7 @@ func init() {
 
 func SaveSnippet(s models.Snippet) (int64, error) {
 	res, err := db.Exec(`INSERT INTO snippets (title, tags, content, created_at) VALUES (?, ?, ?, ?)`,
-		s.Title, strings.Join(s.Tags, ","), s.Content, s.CreatedAt)
+		s.Title, strings.Join(s.Tags, ","), s.Content, s.CreatedAt.Format("2006-01-02 15:04:05"))
 	if err != nil {
 		return 0, err
 	}
@@ -65,7 +78,18 @@ func ListAllSnippets() ([]models.Snippet, error) {
 		}
 
 		// Parse created_at
-		s.CreatedAt, _ = time.Parse("2006-01-02 15:04:05", createdAtStr)
+		if createdAtStr != "" {
+			if parsedTime, err := time.Parse("2006-01-02 15:04:05", createdAtStr); err == nil {
+				s.CreatedAt = parsedTime
+			} else {
+				// Try alternative format
+				if parsedTime, err := time.Parse(time.RFC3339, createdAtStr); err == nil {
+					s.CreatedAt = parsedTime
+				} else {
+					s.CreatedAt = time.Now() // fallback
+				}
+			}
+		}
 
 		snippets = append(snippets, s)
 	}
@@ -95,7 +119,18 @@ func GetSnippetByID(id int) (*models.Snippet, error) {
 	}
 
 	// Parse created_at
-	s.CreatedAt, _ = time.Parse("2006-01-02 15:04:05", createdAtStr)
+	if createdAtStr != "" {
+		if parsedTime, err := time.Parse("2006-01-02 15:04:05", createdAtStr); err == nil {
+			s.CreatedAt = parsedTime
+		} else {
+			// Try alternative format
+			if parsedTime, err := time.Parse(time.RFC3339, createdAtStr); err == nil {
+				s.CreatedAt = parsedTime
+			} else {
+				s.CreatedAt = time.Now() // fallback
+			}
+		}
+	}
 
 	return &s, nil
 }
@@ -108,14 +143,15 @@ func SearchSnippets(query string, tagFilter string) ([]models.Snippet, error) {
 	query = strings.ToLower(query)
 
 	if tagFilter != "" {
-		// Search with tag filter
+		// Search with tag filter - use word boundaries to match exact tags
 		rows, err = db.Query(`
 			SELECT id, title, tags, content, created_at
 			FROM snippets
 			WHERE (LOWER(title) LIKE ? OR LOWER(content) LIKE ?)
-			AND LOWER(tags) LIKE ?
+			AND (LOWER(tags) LIKE ? OR LOWER(tags) LIKE ? OR LOWER(tags) LIKE ? OR LOWER(tags) = ?)
 			ORDER BY created_at DESC`,
-			"%"+query+"%", "%"+query+"%", "%"+strings.ToLower(tagFilter)+"%")
+			"%"+query+"%", "%"+query+"%",
+			strings.ToLower(tagFilter)+",%", "%,"+strings.ToLower(tagFilter)+",%", "%,"+strings.ToLower(tagFilter), strings.ToLower(tagFilter))
 	} else {
 		// Search without tag filter
 		rows, err = db.Query(`
@@ -148,7 +184,18 @@ func SearchSnippets(query string, tagFilter string) ([]models.Snippet, error) {
 		}
 
 		// Parse created_at
-		s.CreatedAt, _ = time.Parse("2006-01-02 15:04:05", createdAtStr)
+		if createdAtStr != "" {
+			if parsedTime, err := time.Parse("2006-01-02 15:04:05", createdAtStr); err == nil {
+				s.CreatedAt = parsedTime
+			} else {
+				// Try alternative format
+				if parsedTime, err := time.Parse(time.RFC3339, createdAtStr); err == nil {
+					s.CreatedAt = parsedTime
+				} else {
+					s.CreatedAt = time.Now() // fallback
+				}
+			}
+		}
 
 		snippets = append(snippets, s)
 	}
@@ -180,4 +227,21 @@ func DeleteSnippet(id int) error {
 	}
 
 	return nil
+}
+
+// getDBPath returns the path to the database file
+func getDBPath() string {
+	// Check for custom path in environment variable
+	if dbPath := os.Getenv("SNIP_DB_PATH"); dbPath != "" {
+		return dbPath
+	}
+
+	// Default to ~/.snipdb/snippets.db
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		// Fallback to temp directory
+		return filepath.Join(os.TempDir(), "snip.db")
+	}
+
+	return filepath.Join(homeDir, ".snipdb", "snippets.db")
 }
