@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/lubasinkal/snip/internal/storage"
+	"github.com/lubasinkal/snip/internal/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -20,14 +21,14 @@ var editCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		id, err := strconv.Atoi(args[0])
 		if err != nil {
-			fmt.Println("❌ Invalid snippet ID. Please provide a valid number.")
+			fmt.Println(ui.RenderError("Invalid snippet ID. Please provide a valid number."))
 			return
 		}
 
 		// Get the snippet
 		snippet, err := storage.GetSnippetByID(id)
 		if err != nil {
-			fmt.Printf("❌ %s\n", err.Error())
+			fmt.Println(ui.RenderError(err.Error()))
 			return
 		}
 
@@ -44,7 +45,7 @@ var editCmd = &cobra.Command{
 			} else if _, err := exec.LookPath("notepad"); err == nil {
 				editor = "notepad"
 			} else {
-				fmt.Println("❌ No editor found. Please set the EDITOR environment variable.")
+				fmt.Println(ui.RenderError("No editor found. Please set the EDITOR environment variable."))
 				return
 			}
 		}
@@ -52,7 +53,7 @@ var editCmd = &cobra.Command{
 		// Create temporary file
 		tmpFile, err := ioutil.TempFile("", fmt.Sprintf("snip_%d_*.txt", id))
 		if err != nil {
-			fmt.Println("❌ Error creating temporary file:", err)
+			fmt.Println(ui.RenderError("Error creating temporary file: " + err.Error()))
 			return
 		}
 		defer os.Remove(tmpFile.Name())
@@ -60,13 +61,15 @@ var editCmd = &cobra.Command{
 		// Write current content to temp file
 		_, err = tmpFile.WriteString(snippet.Content)
 		if err != nil {
-			fmt.Println("❌ Error writing to temporary file:", err)
+			fmt.Println(ui.RenderError("Error writing to temporary file: " + err.Error()))
 			return
 		}
 		tmpFile.Close()
 
-		// Open editor
-		fmt.Printf("📝 Opening snippet '%s' in %s...\n", snippet.Title, editor)
+		// Show what we're editing
+		fmt.Println(ui.RenderInfo(fmt.Sprintf("%s Opening snippet '%s' in %s...", ui.IconEdit, snippet.Title, editor)))
+		fmt.Println()
+		fmt.Println(ui.RenderSnippetCard(*snippet, false))
 		
 		var editorCmd *exec.Cmd
 		if editor == "code" {
@@ -81,21 +84,21 @@ var editCmd = &cobra.Command{
 
 		err = editorCmd.Run()
 		if err != nil {
-			fmt.Printf("❌ Error running editor: %s\n", err)
+			fmt.Println(ui.RenderError("Error running editor: " + err.Error()))
 			return
 		}
 
 		// Read the modified content
 		modifiedContent, err := ioutil.ReadFile(tmpFile.Name())
 		if err != nil {
-			fmt.Println("❌ Error reading modified file:", err)
+			fmt.Println(ui.RenderError("Error reading modified file: " + err.Error()))
 			return
 		}
 
 		// Check if content changed
 		newContent := string(modifiedContent)
 		if newContent == snippet.Content {
-			fmt.Println("📝 No changes made.")
+			fmt.Println(ui.RenderInfo("No changes made."))
 			return
 		}
 
@@ -103,11 +106,11 @@ var editCmd = &cobra.Command{
 		snippet.Content = strings.TrimRight(newContent, "\n\r")
 		err = storage.UpdateSnippet(*snippet)
 		if err != nil {
-			fmt.Println("❌ Error saving changes:", err)
+			fmt.Println(ui.RenderError("Error saving changes: " + err.Error()))
 			return
 		}
 
-		fmt.Printf("✅ Updated snippet '%s'\n", snippet.Title)
+		fmt.Println(ui.RenderSuccess(fmt.Sprintf("Updated snippet '%s'", snippet.Title)))
 	},
 }
 

@@ -2,13 +2,15 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/lubasinkal/snip/internal/models"
-	"github.com/lubasinkal/snip/internal/storage"
-	"github.com/spf13/cobra"
 	"io"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/lubasinkal/snip/internal/models"
+	"github.com/lubasinkal/snip/internal/storage"
+	"github.com/lubasinkal/snip/internal/ui"
+	"github.com/spf13/cobra"
 )
 
 var tags string
@@ -39,10 +41,23 @@ var saveCmd = &cobra.Command{
 		}
 		id, err := storage.SaveSnippet(snippet)
 		if err != nil {
-			fmt.Println("❌ Error saving snippet:", err)
+			fmt.Println(ui.RenderError("Error saving snippet: " + err.Error()))
 			return
 		}
-		fmt.Println("✅ Snippet saved with ID:", id)
+
+		// Show success message with snippet details
+		successMsg := fmt.Sprintf("Snippet saved with ID: %d", id)
+		fmt.Println(ui.RenderSuccess(successMsg))
+
+		// Show a preview of what was saved
+		fmt.Println()
+		fmt.Println(ui.RenderSnippetCard(models.Snippet{
+			ID:        int(id),
+			Title:     snippet.Title,
+			Tags:      snippet.Tags,
+			CreatedAt: snippet.CreatedAt,
+			Content:   snippet.Content,
+		}, false))
 	},
 }
 

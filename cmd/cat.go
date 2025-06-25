@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/lubasinkal/snip/internal/storage"
+	"github.com/lubasinkal/snip/internal/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -16,13 +17,13 @@ var catCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		id, err := strconv.Atoi(args[0])
 		if err != nil {
-			fmt.Println("❌ Invalid snippet ID. Please provide a valid number.")
+			fmt.Println(ui.RenderError("Invalid snippet ID. Please provide a valid number."))
 			return
 		}
 
 		snippet, err := storage.GetSnippetByID(id)
 		if err != nil {
-			fmt.Printf("❌ %s\n", err.Error())
+			fmt.Println(ui.RenderError(err.Error()))
 			return
 		}
 

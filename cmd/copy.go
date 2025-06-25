@@ -6,6 +6,7 @@ import (
 
 	"github.com/atotto/clipboard"
 	"github.com/lubasinkal/snip/internal/storage"
+	"github.com/lubasinkal/snip/internal/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -17,23 +18,24 @@ var copyCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		id, err := strconv.Atoi(args[0])
 		if err != nil {
-			fmt.Println("❌ Invalid snippet ID. Please provide a valid number.")
+			fmt.Println(ui.RenderError("Invalid snippet ID. Please provide a valid number."))
 			return
 		}
 
 		snippet, err := storage.GetSnippetByID(id)
 		if err != nil {
-			fmt.Printf("❌ %s\n", err.Error())
+			fmt.Println(ui.RenderError(err.Error()))
 			return
 		}
 
 		err = clipboard.WriteAll(snippet.Content)
 		if err != nil {
-			fmt.Println("❌ Error copying to clipboard:", err)
+			fmt.Println(ui.RenderError("Error copying to clipboard: " + err.Error()))
 			return
 		}
 
-		fmt.Printf("📋 Copied snippet '%s' to clipboard!\n", snippet.Title)
+		successMsg := fmt.Sprintf("%s Copied snippet '%s' to clipboard!", ui.IconCopy, snippet.Title)
+		fmt.Println(ui.RenderSuccess(successMsg))
 	},
 }
 
